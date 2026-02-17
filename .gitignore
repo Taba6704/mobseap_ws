@@ -1,0 +1,11 @@
+build/
+install/
+log/
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.swp
+.DS_Store
+Thumbs.db
+compile_commands.json
