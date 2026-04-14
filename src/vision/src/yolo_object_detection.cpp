@@ -67,6 +67,9 @@ public:
         image_pub_ = this->create_publisher<sensor_msgs::msg::Image>(
             "/vision/image_annotated", 10);
 
+        depth_pub_ = this->create_publisher<sensor_msgs::msg::Image>(
+            "/vision/depth_image", 10);
+        
         target_visible_pub_ = this->create_publisher<std_msgs::msg::Bool>(
             "/target_visible", 10);
 
@@ -111,18 +114,28 @@ private:
     {
         pipeline_ = std::make_unique<dai::Pipeline>();
 
+        // RGB camera for detection
         auto camera = pipeline_->create<dai::node::Camera>();
         camera->build();
 
+        // Detection network
         auto det = pipeline_->create<dai::node::DetectionNetwork>();
-
         dai::NNArchive archive(model_path_);
         det->build(camera, archive);
 
         labels_ = det->getClasses();
 
+        // Stereo depth node
+        auto stereo = pipeline_->create<dai::node::StereoDepth>();
+        stereo->build(
+            true,  // auto-create stereo cameras
+            dai::node::StereoDepth::PresetMode::DEFAULT
+        );
+
+        // Create output queues
         q_rgb_ = det->passthrough.createOutputQueue();
         q_det_ = det->out.createOutputQueue();
+        q_depth_ = stereo->depth.createOutputQueue();
 
         pipeline_->start();
     }
@@ -196,9 +209,11 @@ private:
         {
             auto rgb_msg = q_rgb_->get();
             auto det_msg_any = q_det_->get();
+            auto depth_msg_any = q_depth_->tryGet();
 
             auto in_rgb = std::dynamic_pointer_cast<dai::ImgFrame>(rgb_msg);
             auto in_det = std::dynamic_pointer_cast<dai::ImgDetections>(det_msg_any);
+            auto in_depth = std::dynamic_pointer_cast<dai::ImgFrame>(depth_msg_any);
 
             if(!in_rgb) {
                 continue;
@@ -360,6 +375,19 @@ private:
                     cv::Scalar(255, 255, 255),
                     2);
             }
+            
+            if(in_depth) {
+                cv::Mat depth_frame = in_depth->getFrame();
+
+                auto depth_img_msg = cv_bridge::CvImage(
+                std_msgs::msg::Header(),
+                "16UC1",
+                depth_frame).toImageMsg();
+
+                depth_img_msg->header.stamp = this->now();
+                depth_img_msg->header.frame_id = "oak_depth";
+                depth_pub_->publish(*depth_img_msg);
+            }
 
             auto img_msg = cv_bridge::CvImage(
                 std_msgs::msg::Header(),
@@ -383,12 +411,14 @@ private:
     std::unique_ptr<dai::Pipeline> pipeline_;
     std::shared_ptr<dai::MessageQueue> q_rgb_;
     std::shared_ptr<dai::MessageQueue> q_det_;
+    std::shared_ptr<dai::MessageQueue> q_depth_;
 
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr target_visible_pub_;
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr target_pixel_error_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr target_center_pub_;
     rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr target_detection_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth_pub_;
 
     std::atomic<bool> running_{false};
     std::thread worker_;

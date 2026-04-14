@@ -40,7 +40,30 @@ target_include_directories(yolo_object_detection PRIVATE
   ${OpenCV_INCLUDE_DIRS}
 )
 
-install(TARGETS yolo_object_detection
+add_executable(target_range_node
+  src/target_range_node.cpp
+)
+
+ament_target_dependencies(target_range_node
+  rclcpp
+  std_msgs
+  sensor_msgs
+  vision_msgs
+  cv_bridge
+)
+
+target_include_directories(target_range_node PRIVATE
+  /opt/ros/humble/include
+  ${OpenCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(target_range_node
+  ${OpenCV_LIBS}
+)
+
+install(TARGETS
+  yolo_object_detection
+  target_range_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
