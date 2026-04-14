@@ -28,6 +28,7 @@ target_link_libraries(yolo_object_detection
 
 ament_target_dependencies(yolo_object_detection
   rclcpp
+  std_msgs
   sensor_msgs
   vision_msgs
   cv_bridge
