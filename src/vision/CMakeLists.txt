@@ -17,9 +17,7 @@ find_package(OpenCV REQUIRED)
 find_package(depthai CONFIG REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-add_executable(yolo_object_detection
-  src/yolo_object_detection.cpp
-)
+add_executable(yolo_object_detection src/yolo_object_detection.cpp)
 
 target_link_libraries(yolo_object_detection
   depthai::core

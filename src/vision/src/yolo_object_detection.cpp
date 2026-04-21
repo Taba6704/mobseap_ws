@@ -53,10 +53,10 @@ public:
             "/home/mobseap/models/YOLOv6_Nano-R2_COCO_512x288.rvc4.tar.xz");
 
         sports_ball_conf_min_ = this->declare_parameter<double>(
-            "sports_ball_conf_min", 0.35);
+            "sports_ball_conf_min", 0.30);
 
         person_conf_min_ = this->declare_parameter<double>(
-            "person_conf_min", 0.45);
+            "person_conf_min", 0.20);
 
         prefer_sports_ball_ = this->declare_parameter<bool>(
             "prefer_sports_ball", true);
