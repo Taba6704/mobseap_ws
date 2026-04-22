@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="usv">
+
+  <!-- Basic dimensions -->
+  <xacro:property name="hull_length" value="1.0"/>
+  <xacro:property name="hull_width" value="0.45"/>
+  <xacro:property name="hull_height" value="0.20"/>
+
+  <xacro:property name="camera_size" value="0.08"/>
+
+  <!-- Base hull -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${hull_length} ${hull_width} ${hull_height}"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0.1 0.3 0.8 1.0"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${hull_length} ${hull_width} ${hull_height}"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0.0" rpy="0 0 0"/>
+      <mass value="15.0"/>
+      <inertia
+        ixx="1.0"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="1.0"
+        iyz="0.0"
+        izz="1.0"/>
+    </inertial>
+  </link>
+
+  <!-- Camera frame -->
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${camera_size} ${camera_size} ${camera_size}"/>
+      </geometry>
+      <material name="gray">
+        <color rgba="0.4 0.4 0.4 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.30 0.0 0.14" rpy="0 0 0"/>
+  </joint>
+
+</robot>

@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>usv_sim</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="BASSOT@my.erau.edu">mobseap</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- Build Tool -->
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Core ROS -->
+  <depend>rclpy</depend>
+
+  <!-- Messages -->
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+
+  <!-- TF -->
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+
+  <!-- Robot Model -->
+  <depend>robot_state_publisher</depend>
+  <depend>xacro</depend>
+
+  <!-- Visualization -->
+  <depend>rviz2</depend>
+
+  <!-- (Optional) -->
+  <depend>std_msgs</depend>
+
+  <!-- Test -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
