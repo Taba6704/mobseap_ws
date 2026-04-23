@@ -24,6 +24,10 @@ setup(
         (os.path.join('share', package_name, 'urdf'),
             glob('urdf/*')),
 
+        # Meshes
+        (os.path.join('share', package_name, 'meshes'), 
+            glob('meshes/*')),
+
         # RViz config files
         (os.path.join('share', package_name, 'rviz'),
             glob('rviz/*')),
