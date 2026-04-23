@@ -8,6 +8,11 @@
 
   <xacro:property name="camera_size" value="0.08"/>
 
+  <!-- Water plane size -->
+  <xacro:property name="water_length" value="60.0"/>
+  <xacro:property name="water_width" value="60.0"/>
+  <xacro:property name="water_thickness" value="0.02"/>
+
   <!-- Base hull -->
   <link name="base_link">
     <visual>
@@ -57,6 +62,25 @@
     <parent link="base_link"/>
     <child link="camera_link"/>
     <origin xyz="0.30 0.0 0.14" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Water plane -->
+  <link name="water_plane">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${water_length} ${water_width} ${water_thickness}"/>
+      </geometry>
+      <material name="water_blue">
+        <color rgba="0.0 0.35 0.65 0.55"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="water_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="water_plane"/>
+    <origin xyz="0 0 -0.12" rpy="0 0 0"/>
   </joint>
 
 </robot>
