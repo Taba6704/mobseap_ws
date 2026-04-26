@@ -56,7 +56,10 @@ public:
             "sports_ball_conf_min", 0.30);
 
         person_conf_min_ = this->declare_parameter<double>(
-            "person_conf_min", 0.20);
+            "person_conf_min", 0.35);
+
+        nn_conf_min_ = this->declare_parameter<double>(
+            "nn_conf_min", 0.30);
 
         prefer_sports_ball_ = this->declare_parameter<bool>(
             "prefer_sports_ball", true);
@@ -122,6 +125,7 @@ private:
         auto det = pipeline_->create<dai::node::DetectionNetwork>();
         dai::NNArchive archive(model_path_);
         det->build(camera, archive);
+        det->setConfidenceThreshold(static_cast<float>(nn_conf_min_)); // lower internal DepthAI filtering threshold
 
         labels_ = det->getClasses();
 
@@ -405,6 +409,7 @@ private:
     double person_conf_min_;
     bool prefer_sports_ball_;
     bool show_only_selected_target_;
+    double nn_conf_min_;
 
     std::optional<std::vector<std::string>> labels_;
 
