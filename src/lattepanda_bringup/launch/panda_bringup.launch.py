@@ -9,6 +9,13 @@ def generate_launch_description():
         output='screen'
     )
 
+    range_node = Node(
+        package='vision',
+        executable='target_range_node',
+        name='range_node',
+        output='screen'
+    )
+
     path_planning_node = Node(
         package='simple_path_planner',
         executable='simple_path_planner_node',
@@ -18,5 +25,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         vision_node,
+        range_node,
         path_planning_node,
     ])
