@@ -14,16 +14,22 @@ SimplePathPlannerNode::SimplePathPlannerNode()
   lock_timer_active_(false)
 {
   // Parameters
-  this->declare_parameter("search_yaw_rate", -0.30);      // clockwise, adjust sign if needed
-  this->declare_parameter("yaw_kp", 0.80);
-  this->declare_parameter("max_yaw_rate", 0.60);
+  this->declare_parameter("search_yaw_rate", -0.1);   // clockwise, adjust sign if needed
+  this->declare_parameter("brake_yaw_rate", 0.20);     // opposite of search_yaw_rate
+  this->declare_parameter("brake_time_sec", 0.6);     // short counter-steer time
+
+  this->declare_parameter("yaw_kp", 0.25);
+  this->declare_parameter("max_yaw_rate", 0.40);
   this->declare_parameter("approach_speed", 0.35);
-  this->declare_parameter("center_tolerance", 0.08);
+  this->declare_parameter("center_tolerance", 0.20);
   this->declare_parameter("lock_time_sec", 0.50);
   this->declare_parameter("stop_distance_m", 2.0);
   this->declare_parameter("target_timeout_sec", 0.75);
 
   this->get_parameter("search_yaw_rate", search_yaw_rate_);
+  this->get_parameter("brake_yaw_rate", brake_yaw_rate_);
+  this->get_parameter("brake_time_sec", brake_time_sec_);
+
   this->get_parameter("yaw_kp", yaw_kp_);
   this->get_parameter("max_yaw_rate", max_yaw_rate_);
   this->get_parameter("approach_speed", approach_speed_);
@@ -53,6 +59,7 @@ SimplePathPlannerNode::SimplePathPlannerNode()
     100ms, std::bind(&SimplePathPlannerNode::controlLoop, this));
 
   last_target_seen_time_ = this->now();
+  brake_start_time_ = this->now();
 
   RCLCPP_INFO(this->get_logger(), "Simple path planner node started.");
 }
@@ -104,13 +111,35 @@ void SimplePathPlannerNode::controlLoop()
     case PlannerState::SEARCH:
     {
       if (target_recent) {
-        state_ = PlannerState::ALIGN;
+        state_ = PlannerState::BRAKE;
+        brake_start_time_ = now;
         lock_timer_active_ = false;
-        RCLCPP_INFO(this->get_logger(), "Target detected. Switching to ALIGN.");
+        RCLCPP_INFO(this->get_logger(), "Target detected. Switching to BRAKE.");
       } else {
         cmd.linear.x = 0.0;
         cmd.angular.z = search_yaw_rate_;
       }
+      break;
+    }
+
+    case PlannerState::BRAKE:
+    {
+      if (!target_recent) {
+        state_ = PlannerState::SEARCH;
+        lock_timer_active_ = false;
+        RCLCPP_WARN(this->get_logger(), "Target lost during BRAKE. Returning to SEARCH.");
+        break;
+      }
+
+      cmd.linear.x = 0.0;
+      cmd.angular.z = brake_yaw_rate_;
+
+      if ((now - brake_start_time_).seconds() >= brake_time_sec_) {
+        state_ = PlannerState::ALIGN;
+        lock_timer_active_ = false;
+        RCLCPP_INFO(this->get_logger(), "Brake complete. Switching to ALIGN.");
+      }
+
       break;
     }
 

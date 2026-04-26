@@ -15,6 +15,7 @@ private:
   enum class PlannerState
   {
     SEARCH,
+    BRAKE,
     ALIGN,
     APPROACH,
     COMPLETE
@@ -43,6 +44,9 @@ private:
   bool target_visible_;
   double pixel_error_;
   double target_range_m_;
+  double brake_yaw_rate_;
+  double brake_time_sec_;
+  rclcpp::Time brake_start_time_;
   rclcpp::Time last_target_seen_time_;
   rclcpp::Time lock_start_time_;
 
