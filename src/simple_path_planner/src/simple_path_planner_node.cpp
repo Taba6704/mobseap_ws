@@ -14,29 +14,37 @@ SimplePathPlannerNode::SimplePathPlannerNode()
   lock_timer_active_(false)
 {
   // Parameters
-  this->declare_parameter("search_yaw_rate", -0.1);   // clockwise, adjust sign if needed
-  this->declare_parameter("brake_yaw_rate", 0.20);     // opposite of search_yaw_rate
-  this->declare_parameter("brake_time_sec", 0.6);     // short counter-steer time
-
-  this->declare_parameter("yaw_kp", 0.25);
-  this->declare_parameter("max_yaw_rate", 0.40);
-  this->declare_parameter("approach_speed", 0.35);
-  this->declare_parameter("center_tolerance", 0.20);
-  this->declare_parameter("lock_time_sec", 0.50);
-  this->declare_parameter("stop_distance_m", 2.0);
-  this->declare_parameter("target_timeout_sec", 0.75);
+  this->declare_parameter("search_yaw_rate", -0.1);          // Right twist, adjust sign if needed
+  this->declare_parameter("brake_yaw_rate", 0.20);           // BRAKE thrust, opposite of search_yaw_rate
+  this->declare_parameter("brake_time_sec", 0.6);            // Counter-steer time (seconds)
+  this->declare_parameter("yaw_kp", 0.25);                   // Yaw P Controller gain
+  this->declare_parameter("max_yaw_rate", 0.40);             // Max angular (z) /cmd_vel_auto message while in APPROACH state (mapped from -1 to 1)
+  this->declare_parameter("approach_speed", 0.35);           // Max linear (x) /cmd_vel_auto message while in APPROACH state (mapped from -1 to 1)
+  this->declare_parameter("center_tolerance", 0.20);         //
+  this->declare_parameter("lock_time_sec", 0.50);            //
+  this->declare_parameter("target_timeout_sec", 0.75);       //
+  this->declare_parameter("hold_target_distance_m", 2.0);    // When target reaches 2.0 meters -> enter HOLD State
+  this->declare_parameter("hold_inner_distance_m", 1.5);     // Closest USV will be allowed from target before emergency back thrust
+  this->declare_parameter("hold_outer_distance_m", 2.8);     // Farthest USV will be allowed from target before entering APPROACH state
+  this->declare_parameter("hold_distance_deadband_m", 0.25); // Max allowed error for target distance compared to hold distance
+  this->declare_parameter("hold_distance_kp", 0.20);         // HOLD state P controller gain
+  this->declare_parameter("max_hold_speed", 0.15);           // Max /cmd_vel_auto message while in HOLD state (mapped from -1 to 1)
 
   this->get_parameter("search_yaw_rate", search_yaw_rate_);
   this->get_parameter("brake_yaw_rate", brake_yaw_rate_);
   this->get_parameter("brake_time_sec", brake_time_sec_);
-
   this->get_parameter("yaw_kp", yaw_kp_);
   this->get_parameter("max_yaw_rate", max_yaw_rate_);
   this->get_parameter("approach_speed", approach_speed_);
   this->get_parameter("center_tolerance", center_tolerance_);
   this->get_parameter("lock_time_sec", lock_time_sec_);
-  this->get_parameter("stop_distance_m", stop_distance_m_);
   this->get_parameter("target_timeout_sec", target_timeout_sec_);
+  this->get_parameter("hold_target_distance_m", hold_target_distance_m_);
+  this->get_parameter("hold_inner_distance_m", hold_inner_distance_m_);
+  this->get_parameter("hold_outer_distance_m", hold_outer_distance_m_);
+  this->get_parameter("hold_distance_deadband_m", hold_distance_deadband_m_);
+  this->get_parameter("hold_distance_kp", hold_distance_kp_);
+  this->get_parameter("max_hold_speed", max_hold_speed_);
 
   // Subscribers
   target_visible_sub_ = this->create_subscription<std_msgs::msg::Bool>(
@@ -182,16 +190,22 @@ void SimplePathPlannerNode::controlLoop()
         break;
       }
 
-      if (target_range_m_ <= stop_distance_m_) {
-        state_ = PlannerState::COMPLETE;
-        RCLCPP_INFO(this->get_logger(), "Target reached within %.2f m. Mission complete.", stop_distance_m_);
+      // Once inside the hold band, switch to HOLD
+      if (target_range_m_ <= hold_outer_distance_m_ && target_range_m_ >= hold_inner_distance_m_) {
+        state_ = PlannerState::HOLD;
+        lock_timer_active_ = false;
+        RCLCPP_INFO(
+          this->get_logger(),
+          "Target inside hold band %.2f m to %.2f m. Switching to HOLD.",
+          hold_inner_distance_m_,
+          hold_outer_distance_m_);
         break;
       }
 
       double yaw_cmd = -yaw_kp_ * pixel_error_;
       yaw_cmd = clamp(yaw_cmd, -max_yaw_rate_, max_yaw_rate_);
 
-      // Optional: reduce forward speed if target is off-center
+      // Reduce forward speed if target is off-center
       double forward_scale = 1.0;
       if (std::abs(pixel_error_) > center_tolerance_) {
         forward_scale = 0.5;
@@ -205,14 +219,50 @@ void SimplePathPlannerNode::controlLoop()
       break;
     }
 
-    case PlannerState::COMPLETE:
+    case PlannerState::HOLD:
     {
-      cmd.linear.x = 0.0;
-      cmd.angular.z = 0.0;
+      if (!target_recent) {
+        state_ = PlannerState::SEARCH;
+        lock_timer_active_ = false;
+        RCLCPP_WARN(this->get_logger(), "Target lost during HOLD. Returning to SEARCH.");
+        break;
+      }
+
+      // If target gets too far away, go approach again.
+      if (target_range_m_ > hold_outer_distance_m_) {
+        state_ = PlannerState::APPROACH;
+        lock_timer_active_ = false;
+        RCLCPP_INFO(this->get_logger(), "Target beyond hold range. Returning to APPROACH.");
+        break;
+      }
+
+      double yaw_cmd = -yaw_kp_ * pixel_error_;
+      yaw_cmd = clamp(yaw_cmd, -max_yaw_rate_, max_yaw_rate_);
+
+      // Positive error means target is farther than desired.
+      // Negative error means target is too close.
+      double distance_error = target_range_m_ - hold_target_distance_m_;
+
+      double hold_speed_cmd = 0.0;
+
+      if (std::abs(distance_error) > hold_distance_deadband_m_) {
+        hold_speed_cmd = hold_distance_kp_ * distance_error;
+        hold_speed_cmd = clamp(hold_speed_cmd, -max_hold_speed_, max_hold_speed_);
+      }
+
+      // Safety: if closer than inner distance, allow reverse correction.
+      // If reverse is too aggressive in testing, lower max_hold_speed.
+      if (target_range_m_ < hold_inner_distance_m_) {
+        hold_speed_cmd = -max_hold_speed_;
+      }
+
+      cmd.linear.x = hold_speed_cmd;
+      cmd.angular.z = yaw_cmd;
+
       break;
     }
   }
-
+  
   cmd_vel_auto_pub_->publish(cmd);
 }
 

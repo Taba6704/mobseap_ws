@@ -18,7 +18,7 @@ private:
     BRAKE,
     ALIGN,
     APPROACH,
-    COMPLETE
+    HOLD
   };
 
   void targetVisibleCallback(const std_msgs::msg::Bool::SharedPtr msg);
@@ -63,6 +63,12 @@ private:
   double lock_time_sec_;
   double stop_distance_m_;
   double target_timeout_sec_;
+  double hold_target_distance_m_;
+  double hold_inner_distance_m_;
+  double hold_outer_distance_m_;
+  double hold_distance_deadband_m_;
+  double hold_distance_kp_;
+  double max_hold_speed_;
 };
 
 #endif  // SIMPLE_PATH_PLANNER__SIMPLE_PATH_PLANNER_NODE_HPP_
